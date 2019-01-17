@@ -1,0 +1,121 @@
+#!/bin/bash
+
+function usage() {
+    echo
+    echo "usage:"
+    echo "  vm [label] [up|down|ssh]"
+    echo
+    echo "available VMs:"
+    echo "  f9m f94 f93 ezn fwa"
+    echo
+    exit 1;
+}
+
+function vboxvm_up() {
+    VBoxHeadless -s "$1" &
+}
+
+function vboxvm_down() {
+    VBoxManage controlvm "$1" acpipowerbutton
+}
+function vboxvm_ssh() {
+    echo "ssh $1"
+    ssh $1
+}
+function vagrant_up() {
+    cd "$1"
+    vagrant up
+    vagrant_ssh "$1"
+}
+function vagrant_down() {
+    cd "$1"
+    vagrant halt
+}
+function vagrant_ssh() {
+    cd "$1"
+    vagrant ssh
+}
+function freeside_nfs_mount() {
+    cd "/home/username/.freeside/$1"
+    mount perlib
+    mount src
+    mount www
+}
+function freeside_nfs_umount() {
+    cd "/home/username/.freeside/$1"
+    umount perlib
+    umount src
+    umount www
+}
+
+case "$1" in
+  f9m)
+    vmtype="vbox"
+    vmname="freeside-deb9-master"
+    fmshort="f9m"
+    fsnfs=1
+    ;;
+  f94)
+    vmtype="vbox"
+    vmname="freeside-deb9-fs4"
+    fmshort="f94"
+    fsnfs=1
+    ;;
+  f93)
+    vmtype="vbox"
+    vmname="freeside-deb9-fs3"
+    fmshort="f93"
+    fsnfs=1
+    ;;
+  ezn)
+    vmtype="vagrant"
+    vagrant_dir="/home/username/Projects/ezn/eznbooking/Vagrant"
+    ;;
+  fwa)
+    vmtype="vagrant"
+    vagrant_dir="/home/username/Projects/fwa-dev/FwaGuestServices/Vagrant"
+    ;;
+  *)
+    usage
+    ;;
+
+esac;
+
+if [ "$vmtype" == "vbox" ]
+then
+    case "$2" in
+        up)
+            echo "vmname: $vmname"
+            vboxvm_up "$vmname"
+            if [ $fsnfs == 1 ] ; then freeside_nfs_mount "$fmshort" ; fi
+            vboxvm_ssh "$vmname"
+            ;;
+        down)
+            if [ $fsnfs == 1 ] ; then freeside_nfs_umount "$fmshort" ; fi
+            vboxvm_down "$vmname"
+            ;;
+        *)
+            vboxvm_ssh "$vmname"
+            ;;
+    esac
+elif [ "$vmtype" == "vagrant" ]
+then
+    case "$2" in
+        up)
+            vagrant_up "$vagrant_dir"
+            vagrant_ssh "$vagrant_dir"
+            ;;
+        down)
+            vagrant_down "$vagrant_dir"
+            ;;
+        *)
+            vagrant_ssh "$vagrant_dir"
+            ;;
+    esac
+else
+    echo
+    echo "something is probably wrong with this script"
+    echo
+    usage
+fi
+
